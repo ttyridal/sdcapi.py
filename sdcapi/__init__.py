@@ -1,0 +1,5 @@
+__author__    = "torbjorn@tyridal.no"
+__copyright__ = "Copyright 2016, Torbjorn Tyridal"
+__version__   = "0.99.0"
+__LICENSE__   = "GPLv3"
+__status__    = "Prototype"
