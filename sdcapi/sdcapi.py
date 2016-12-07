@@ -6,6 +6,7 @@ Copyright 2016, Torbjorn Tyridal
 This program is relased under the GPLv3. See LICENSE for details.
 """
 import base64
+import copy
 import datetime
 import functools
 import hashlib
@@ -216,8 +217,17 @@ class SDCapi(object):
 
     def post(self, url, **kwargs):
         logger.info('============== POST %s ==================', url)
-        if 'json' in kwargs: logger.debug(repr(kwargs['json']))
-        if 'data' in kwargs: logger.debug(repr(kwargs['data']))
+        if 'json' in kwargs:
+            if 'logonpin' in url:
+                kw = {}
+                for k,v in kwargs['json'].items():
+                    kw[k] = 'xxx'
+            else:
+                kw = kwargs['json']
+
+            logger.debug(repr(kw))
+        if 'data' in kwargs:
+            logger.debug(repr(kwargs['data']))
         resp = self._cryptowrap(self.http.post, url, **kwargs)
 
         logger.debug("%s %s", resp.status_code, resp.reason)
@@ -254,7 +264,9 @@ class SDCapi(object):
         d = self.post(self.url('logon/logonpin/v1'), json={
             'pin': pin,
             'userId': userid
-        }).json()
+        })
+        d.encoding=None
+        d = json.loads(d.text, encoding='utf-8')
         return [ Agreement(x, self) for x in d ]
 
     def logout(self):
