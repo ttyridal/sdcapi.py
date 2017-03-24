@@ -123,12 +123,8 @@ class Reservation(JSONWrap): pass
 
 class SDCapi(object):
     def __init__(self, bank_identifier, fake=False):
-        if fake:
-            self.urlbase = 'http://localhost:9998/restapi/'
-            self.server_cert = os.path.join(os.path.dirname(__file__),'sdc_fake.pem')
-        else:
-            self.urlbase = 'https://pilot.smartno.sdc.dk/restapi/'
-            self.server_cert  = os.path.join(os.path.dirname(__file__),'sdc.pem')
+        self.urlbase = 'https://pilot.smartno.sdc.dk/restapi/'
+        self.server_cert  = os.path.join(os.path.dirname(__file__),'sdc.pem')
         self.http = requests.Session()
         self.bankid = bank_identifier
         self.http.stream = True

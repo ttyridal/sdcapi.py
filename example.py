@@ -52,7 +52,7 @@ def main():
     print("see bankidentifiers.pdf for your bank id")
     bankid = int(input("Enter your bank id >"))
 
-    with SDCapi(bank_identifier=bankid, fake=True) as api:
+    with SDCapi(bank_identifier=bankid) as api:
         username, _, pin = netrc().authenticators('sdcbank')
         agreements = api.login(username, pin)
 
