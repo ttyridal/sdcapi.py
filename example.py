@@ -60,7 +60,7 @@ def main():
             ag = select_one(agreements, lambda x: x.agreementName)
             ag.select()
         else:
-            ag[0].select()
+            agreements[0].select()
 
         print("\n".join(repr(x) for x in api.efaktura_list()))
 
