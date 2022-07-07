@@ -18,9 +18,12 @@ from posixpath import join as posix_join
 import uuid
 import ssl
 
+import jwt
+
 import Crypto.Cipher.PKCS1_v1_5
 import Crypto.Util
 import Crypto.PublicKey.RSA
+import Crypto.PublicKey.ECC
 import certifi
 import requests
 import requests_toolbelt
@@ -121,6 +124,38 @@ class Transaction(JSONWrap):
 
 class Reservation(JSONWrap): pass
 
+
+def getDeviceId():
+    return '|'.join([
+            'android_id',
+            '23523623623', #build.serial
+            'xphone', #build.model
+            'corpinc', #build.manufacturer
+            'x1', #build.device
+            'myphone', #getName
+            ])
+
+
+class DeviceIdentity:
+    def __init__(self):
+        from pathlib import Path
+        keypath = Path('devicekey.pem')
+        if keypath.exists():
+            logger.debug("loading stored key")
+            with open(keypath) as f:
+                key = Crypto.PublicKey.ECC.import_key(f.read())
+            strkey=key.export_key(format='PEM')
+        else:
+            key = Crypto.PublicKey.ECC.generate(curve='P-256')
+            strkey=key.export_key(format='PEM')
+            with open(keypath, 'w') as f:
+                f.write(strkey)
+
+        self.pubkey = key.public_key()
+        self.privatekey_str = strkey
+    def pubkeyAsString(self):
+        return base64.b64encode(self.pubkey.export_key(format='DER')) # or 'RAW' ??
+
 class SDCapi(object):
     def __init__(self, bank_identifier, fake=False):
         self.urlbase = 'https://pilot.smartno.sdc.dk/restapi/'
@@ -141,6 +176,33 @@ class SDCapi(object):
         }
         self.finalkey = None
         self.key = getRequestKey()
+        self.devidentity = DeviceIdentity()
+
+
+    def getDeviceToken(self, challenge):
+        iat = datetime.datetime.now()
+        claims = {'device_id': getDeviceId(),
+         'challenge': challenge,
+         'iat': int(iat.timestamp())}
+
+        return jwt.encode(claims, self.devidentity.privatekey_str, algorithm="ES256")
+
+
+    def enableApp(self):
+        self.post(self.url('devices/pin'), apiver=4, json={
+            'phoneNumber': phoneNumber,
+            'otp': otp,
+            'deviceId': getDeviceId(),
+            'publicKey': self.devidentity.pubkeyAsString(),
+            'attestationToken': None, #this is a problem.. safetynet stuff
+            'pkcAlgorithm': 'P-256'  #maybe? don't know what format to put here.
+            })
+
+    def verifyPhoneAndSendOtp(self, phoneNumber, devname):
+        self.post(self.url('devices/phone'), apiver=1, json={
+             'phoneNumber': phoneNumber,
+             'deviceName': devname
+            })
 
     def __enter__(self):
         return self
@@ -261,6 +323,10 @@ class SDCapi(object):
     def site_info(self):
         return JSONWrap(self.get(self.url('miscellaneous/siteInformation'), apiver=1).json(), self)
         #, content_type='application/x-www-form-urlencoded')
+
+    def getChallenge(self):
+        return self.get(self.url('logon/challenge'), 1).json()['value']
+
 
     def login(self, userid, pin):
         resp = self.post(self.url('logon/logonpin'), apiver=3, json={

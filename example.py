@@ -78,11 +78,11 @@ def main():
         config['bank_identifier'] = int(input("Enter your bank id >"))
 
     with SDCapi(bank_identifier=config['bank_identifier']) as api:
-        #print(api.site_info())
         #print(api.bankingdays())
         #return
 
         agreements = api.login(config['username'], config['userpin'])
+        api.http.headers['X-SDC-DEVICE-TOKEN'] = api.getDeviceToken(api.getChallenge())
 
         if len(agreements) > 1:
             ag = select_one(agreements, lambda x: x.agreementName)
