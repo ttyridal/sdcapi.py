@@ -133,7 +133,8 @@ class SDCapi(object):
             'Accept-Encoding':'gzip',
             'Connection': 'Keep-Alive',
             'Accept': 'application/json, */*',
-            'User-Agent':'SDCClient Python/1.0.0',
+##             'User-Agent':'SDCClient Python/1.0.0',
+            'User-Agent':'HockeySDK/Android',
             'X-SDC-LOCALE': 'nb_NO',
             'X-SDC-CLIENT-TYPE': 'smartphone',
             'Accept-Language': 'nb',
@@ -191,8 +192,10 @@ class SDCapi(object):
 
         return resp
 
-    def get(self, url, **kwargs):
+    def get(self, url, apiver, **kwargs):
         logger.info('============== GET %s ==================',url)
+        kwargs['headers'] = kwargs.get('headers', dict())
+        kwargs['headers']['X-SDC-API-VERSION'] = str(apiver)
         resp = self._cryptowrap(self.http.get, url, **kwargs)
 
         logger.debug("%s %s", resp.status_code, resp.reason)
@@ -211,8 +214,11 @@ class SDCapi(object):
 
         return resp
 
-    def post(self, url, **kwargs):
+    def post(self, url, apiver, **kwargs):
         logger.info('============== POST %s ==================', url)
+        kwargs['headers'] = kwargs.get('headers', dict())
+        kwargs['headers']['X-SDC-API-VERSION'] = str(apiver)
+
         if 'json' in kwargs:
             if 'logonpin' in url:
                 kw = {}
@@ -242,7 +248,7 @@ class SDCapi(object):
         return resp
 
     def launch(self):
-        return self.post(self.url('launch/launch/v1'), json={
+        return self.post(self.url('launch/launch'), apiver=1, json={
             "appVersion":"4.0.0",
              "language":"en",
              "platform":"Android",
@@ -253,40 +259,55 @@ class SDCapi(object):
             }).json()
 
     def site_info(self):
-        return JSONWrap(self.get(self.url('miscellaneous/siteInformation/v1')).json(), self)
+        return JSONWrap(self.get(self.url('miscellaneous/siteInformation'), apiver=1).json(), self)
         #, content_type='application/x-www-form-urlencoded')
 
     def login(self, userid, pin):
-        d = self.post(self.url('logon/logonpin/v1'), json={
+        resp = self.post(self.url('logon/logonpin'), apiver=3, json={
             'pin': pin,
             'userId': userid
         })
-        d.encoding=None
-        d = json.loads(d.text, encoding='utf-8')
+        try:
+            d = json.loads(resp.text)
+        except Exception as er:
+            logger.exception("Exception %s\n data was:\n%s\n%s", str(er), resp, resp.text)
+            raise
         return [ Agreement(x, self) for x in d ]
 
     def logout(self):
-        return self.get(self.url('logon/logout/v1')).json()
+        return self.get(self.url('logon/logout'), 1).json()
 
     def select_agreement(self, agreementEntity):
-        return JSONWrap(self.post(self.url('logon/selectagreement/v1'), json=agreementEntity._json).json(), self)
+        return JSONWrap(self.post(self.url('logon/selectagreement'), apiver=3, json=agreementEntity._json).json(), self)
 
     def overview(self):
-        return self.get(self.url('miscellaneous/overview/v1')).json()
+        return self.get(self.url('miscellaneous/overview'), apiver=3).json()
         #, content_type='application/x-www-form-urlencoded')
 
     def accounts(self):
-        d = self.get(self.url('accounts/list/v1?clearCache=false')).json()
-        return [ Account(x, self) for x in d ]
+        accountPropertiesFilter = {
+            'includeCreditAccounts': True,
+            'includeDebitAccounts': True,
+            'includeLoans': True,
+            'onlyFavorites': False,
+            'onlyQueryable': True,
+        }
+        d = self.post(self.url('accounts/list/filter'), apiver=1, json=accountPropertiesFilter).json()
+
+        print("accounts:",d)
+
+
+##         d = self.get(self.url('accounts/list/v1?clearCache=false')).json()
+##         return [ Account(x, self) for x in d ]
         #, content_type='application/x-www-form-urlencoded')
 
     def efaktura_list(self):
-        d = self.get(self.url('efaktura/list/v1')).json()
+        d = self.get(self.url('efaktura/list'), apiver=2).json()
         return [ JSONWrap(x, self) for x in d ]
         #, content_type='application/x-www-form-urlencoded')
 
     def bankingdays(self):
-        return JSONWrap(self.get(self.url('miscellaneous/bankingdays/v1')).json(), self)
+        return JSONWrap(self.get(self.url('miscellaneous/bankingdays'), apiver=1).json(), self)
         #, content_type='application/x-www-form-urlencoded')
 
     def find_transactions(self, accountEntity, dteFrom=None, dteTo=None, includeReservations=True):
@@ -295,7 +316,8 @@ class SDCapi(object):
             dteTo = (dteTo.replace(day=1) + datetime.timedelta(days=32)).replace(day=1) - datetime.timedelta(days=1)
         if dteFrom is None:
             dteFrom = datetime.date.today().replace(day=1)
-        d = self.post(self.url('accounts/transactions/search/v1'), json={
+        d = self.post(self.url('accounts/transactions/search'), apiver=5, json={
+            "clearCache": True,
             "agreementId": accountEntity.agreementId,
             "accountId": accountEntity.accountId,
             "transactionsFrom": dteFrom.isoformat(),
@@ -309,4 +331,4 @@ class SDCapi(object):
 
 
     def transaction_details(self, entityKey):
-        return JSONWrap(self.post(self.url('accounts/transactions/details/v1'), json=entityKey._json).json(), self)
+        return JSONWrap(self.post(self.url('accounts/transactions/details'), apiver=1, json=entityKey._json).json(), self)

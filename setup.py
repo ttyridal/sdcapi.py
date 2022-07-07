@@ -11,8 +11,8 @@ setup(
     author = "Torbjorn Tyridal",
     author_email = "sdcapi@tyridal.no",
     description = ("SDC Banking api"),
-    requires = [
-        "pycrypto",
+    install_requires = [
+        "pycryptodome",
         "certifi",
         "requests",
         "requests_toolbelt",
